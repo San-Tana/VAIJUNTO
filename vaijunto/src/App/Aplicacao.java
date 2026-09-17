@@ -6,6 +6,7 @@ import java.util.Scanner;
 import java.util.Arrays;
 import java.util.List;
 
+import vaijunto.src.model.erros;
 import vaijunto.src.model.okays;
 
 public class Aplicacao {
@@ -35,7 +36,10 @@ public class Aplicacao {
                     String usuario = servicosClient.registroNome(scan);
                     resposta = requisicao("CONSULTAR|" + usuario); // Primeiro revisa o nome de usuário para evitar duplicação
                     if (resposta.equals("OK")) {
-                        requisicao("REGISTRO|" + servicosClient.registrarCliente(scan, usuario));
+                        String registro = servicosClient.registrarCliente(scan, usuario);
+                        if (registro.startsWith("ERRO")) 
+                            servicosClient.mensagensErros(registro.substring(5));
+                        else requisicao("REGISTRO|" + registro);
                     }
                 }
                 else if (opcao.equals("3")) { sair = 1; }
@@ -53,7 +57,11 @@ public class Aplicacao {
 
                 if (opcao.equals("1")) {
                     String viajem = servicosClient.buscarCorrida(scan);
-                    resposta = requisicao("PROCURAR|" + viajem);
+                    if (viajem.startsWith("ERRO")) {
+                        servicosClient.mensagensErros(viajem.substring(5));
+                        continue;
+                    }
+                    resposta = requisicao("BUSCAR|" + Usuario + "|" + viajem);
                     if (resposta.equals("OK")) {
                         System.out.print("\nDigite o ID da corrida que deseja se juntar: ");
                         opcao = scan.nextLine().trim();
@@ -62,8 +70,16 @@ public class Aplicacao {
                 }
                 else if (opcao.equals("2")) {
                     resposta = requisicao("MOTORISTA|" + Usuario);
+                    if (resposta.startsWith("ERRO")) {
+                        servicosClient.mensagensErros(resposta.substring(5));
+                        continue;
+                    }
                     String novaViajem = servicosClient.novaViajem(scan);
-                    resposta = requisicao("DIRIGIR|" + novaViajem);
+                    if (novaViajem.startsWith("ERRO")) {
+                        servicosClient.mensagensErros(novaViajem.substring(5));
+                        continue;
+                    }
+                    resposta = requisicao("PUBLICAR|" + Usuario + "|" + novaViajem);
                 }
                 else if (opcao.equals("3")) {
                     resposta = requisicao("HISTORICO|" + Usuario);
@@ -73,6 +89,7 @@ public class Aplicacao {
                         if (!opcao.isEmpty()) resposta = requisicao("CANCELAR|" + Usuario + "|" + opcao);
                     }
                 }
+                else if (opcao.equals("4")) sair = 1;
             }
         }
         

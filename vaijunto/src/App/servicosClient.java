@@ -37,7 +37,7 @@ public class servicosClient {
         String resposta = scan.nextLine().trim().toUpperCase();
         if (resposta.equals("S") || resposta.equals("SIM")) {
             String veiculo = registrarVeiculo(scan);
-            if (veiculo.substring(0, 3).equals("ERRO")) return veiculo;
+            if (veiculo.startsWith("ERRO")) return veiculo;
             
             return usuario + ";" + senha + ";" + veiculo;
         }
@@ -68,10 +68,11 @@ public class servicosClient {
         System.out.print("\nQual a origem da viajem? ");
         String origem = scan.nextLine().trim();
 
-        if (origem.isEmpty()) return "ERRO|" + erros.CAMPO_VAZIO;
-
         System.out.print("\nQual o destino da viajem?: ");
         String destino = scan.nextLine().trim();
+
+        if (origem.isEmpty() || destino.isEmpty())
+            return "ERRO|" + erros.CAMPO_VAZIO;
 
         return origem + ";" + destino;
     }
@@ -84,16 +85,21 @@ public class servicosClient {
         String destino = scan.nextLine().trim();
 
         String horario = definirHorario(scan);
-        if (horario.substring(0, 3).equals("ERRO")) return horario;
+        if (horario.startsWith("ERRO")) return horario;
 
         System.out.print("\nInforme a quantidade de assentos disponíveis: ");
         String assentos = scan.nextLine().trim();
 
+        System.out.print("\nInforme o preço médio por cada trecho (Somente números inteiros): ");
+        String preco = scan.nextLine().trim();
+        if (!assentos.matches("[0-9]+") || !preco.matches("[0-9]+")) return "ERRO|" + erros.ENTRADA_INVALIDA;
+
         System.out.print("\nDeseja adicionar paradas? [S/N]");
         String parada = scan.nextLine().trim();
         if (parada.matches("(?i)^(sim|s)$")) {
-            String paradas = "PARADAS;" + adicionarParadas(scan);
-            return origem + ";" + destino + ";" + horario + ";" + assentos + ";" + paradas;
+            String paradas = adicionarParadas(scan);
+            if (paradas.startsWith("ERRO")) return paradas;
+            return origem + ";" + destino + ";" + horario + ";" + assentos + ";" + preco + ";" + paradas;
         }
         else if (!parada.matches("(?i)^(nao|não|n)$"))
             return "ERRO|" + erros.ENTRADA_INVALIDA;
@@ -101,7 +107,7 @@ public class servicosClient {
         if (Stream.of(origem, destino, assentos).anyMatch(campo -> campo == null || campo.trim().isEmpty()))
             return "ERRO|" + erros.CAMPO_VAZIO;
 
-        return origem + ";" + destino + ";" + horario + ";" + assentos;
+        return origem + ";" + destino + ";" + horario + ";" + assentos + ";" + preco;
     }
 
     public static String definirHorario(Scanner scan) {
@@ -119,7 +125,7 @@ public class servicosClient {
 
         if (Stream.of(dia, mes, ano, horario).anyMatch(campo -> campo == null || campo.trim().isEmpty()))
             return "ERRO|" + erros.CAMPO_VAZIO;
-        else if (!Stream.of(dia, mes, ano, horario).anyMatch(campo -> campo.matches("[0-9]+")))
+        else if (!Stream.of(dia, mes, ano, horario).allMatch(campo -> campo.matches("[0-9]+")))
             return "ERRO|" + erros.ENTRADA_INVALIDA;
 
         return dia + "&" + mes + "&" + ano + "&" + horario;
@@ -134,9 +140,12 @@ public class servicosClient {
 
             System.out.print("\nDeseja adicionar outra parada? [S/N]: ");
             String resposta = scan.nextLine().trim();
-            if (resposta.matches("(?i)^(nao|não|n)$")) sair = 1;
-            else if (!resposta.matches("(?i)^(sim|s)$")) continue;
-            else return "ERRO|" + erros.ENTRADA_INVALIDA;
+            if (resposta.matches("(?i)^(nao|não|n)$")) 
+                sair = 1;
+            else if (resposta.matches("(?i)^(sim|s)$"))
+                continue;
+            else 
+                return "ERRO|" + erros.ENTRADA_INVALIDA;
         }
 
         return paradas;
@@ -144,7 +153,7 @@ public class servicosClient {
 
     // exibir todas as corridas em que o usuário está registrado/exibir corridas que o usuário pode participar
     public static void exibirHistorico(List<String> historico) {
-        for (String corrida : historico) System.out.println(corrida);
+        for (String corrida : historico) System.out.println(corrida.replace("\\n", "\n"));
     }
 
     public static void mensagensOkays(String mensagem) {

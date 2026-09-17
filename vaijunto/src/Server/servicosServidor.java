@@ -2,6 +2,7 @@ package vaijunto.src.Server;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.HashMap;
 import vaijunto.src.model.*;
@@ -9,9 +10,11 @@ import vaijunto.src.model.*;
 public class servicosServidor {
     private static Map<String, cliente> registros = new HashMap<String, cliente>();
     private static Map<String, corrida> corridas = new HashMap<String, corrida>();
-    private static List<String> temp = new ArrayList<String>(); // Lista temporária para armazenar corridas combinadas durante a busca de corridas
+    private static Map<String, List<String>> temp = new HashMap<>(); // Lista temporária para armazenar corridas combinadas durante a busca de corridas
 
     // Faz o login do cliente, verificando se o usuário não está logado, se a senha está correta e se o usuário existe no sistema
+    // login[0] = usuario
+    // login[1] = senha
     public synchronized static String login(String dados) {
         String login[] = dados.split("\\;");
         if (!registros.containsKey(login[0])) return "ERRO|" + erros.USUARIO_SEM_REGISTRO;
@@ -26,15 +29,23 @@ public class servicosServidor {
     }
 
     // Adiciona um usuário novo nos registros, verificando se no meio tempo outro usuário não criou uma conta com mesmo nome
+    // registro[0] = usuario
+    // registro[1] = senha
+    // registro[2] = veiculo
     public synchronized static String registro(String dados) {
         String registro[] = dados.split("\\;");
 
         // Dois usuários escolhem o mesmo nome ao registrar ao mesmo tempo, apenas um pode ter o nome
         String checagem = existeUsuario(registro[0]);
-        if (checagem.substring(0, 3).equals("ERRO")) return checagem;
+        if (checagem.startsWith("ERRO")) return checagem;
 
-        if (registro.length > 2) {
-            String motorista[] = registro[3].split("\\&");
+        // Cliente tem ou não veiculo
+        if (registro.length == 3) {
+            // motorista[0] = CNH
+            // motorista[1] = tipo
+            // motorista[2] = modelo
+            // motorista[3] = placa
+            String motorista[] = registro[2].split("\\&");
             motorista veiculo = new motorista(motorista[0], motorista[1], motorista[2], motorista[3]);
             cliente novo = new cliente(registro[0], registro[1], veiculo);
             registros.put(novo.getUsuario(), novo);
@@ -44,7 +55,7 @@ public class servicosServidor {
             registros.put(novo.getUsuario(), novo);
         }
 
-        System.out.println("Cliente registrado: " + registros.get(registro[0]).getUsuario());
+        System.out.println("Cliente registrado: " + registros.get(registro[0]));
         return "OK|" + okays.USUARIO_REGISTRADO + "|" + registro[0];
     }
 
@@ -67,23 +78,28 @@ public class servicosServidor {
     }
 
     // Registra uma nova corrida, seja ela com ou sem paradas, e adiciona a corrida no histórico do usuário
+    // corrida[0] = origem
+    // corrida[1] = destino
+    // corrida[2] = horario
+    // corrida[3] = assentos
+    // corrida[4] = preco;
+    // corrida[5] = paradas
     public synchronized static String publicarCorrida(String usuario, String dados) {
         String corrida[] = dados.split("\\;");
-        String data[] = corrida[6].split("\\&");
+        String data[] = corrida[2].split("\\&");
         data horario = new data(data[0], data[1], data[2], data[3]);
-        int bancos = Integer.parseInt(corrida[4]);
-        int preco = Integer.parseInt(corrida[5]);
+        int bancos = Integer.parseInt(corrida[3]);
+        int preco = Integer.parseInt(corrida[4]);
 
         String ID = String.format("CAR%03d", corridas.size() + 1);
 
-        if (corrida.length > 6) {
-            List<String> paradas = new ArrayList<String>();
-            for (int i = 6; i < corrida.length; i++) { paradas.add(corrida[i]); }
-            corridas.put(ID, new corrida(ID, corrida[0], corrida[1], corrida[2], horario, bancos, preco, paradas));
+        if (corrida.length == 6) {
+            List<String> paradas = Arrays.asList(corrida[5].split("\\&"));
+            corridas.put(ID, new corrida(ID, usuario, corrida[0], corrida[1], horario, bancos, preco, paradas));
             registros.get(usuario).addCorrida(ID);
         }
         else { 
-            corridas.put(ID, new corrida(ID, corrida[0], corrida[1], corrida[2], horario, bancos, preco));
+            corridas.put(ID, new corrida(ID, usuario, corrida[0], corrida[1], horario, bancos, preco));
             registros.get(usuario).addCorrida(ID);
         }
 
@@ -93,8 +109,8 @@ public class servicosServidor {
 
     // Reserva um assento da corrida para o usuario, um por vez para que um usuário não reserve um assento que não existe
     public synchronized static String reservarCorrida(String usuario, String ID) {
-        if (ID.substring(0,2).equals("CAR")) {
-
+        if (ID.startsWith("CAR")) {
+            if (!corridas.containsKey(ID)) return "ERRO|" + erros.CORRIDA_NAO_ENCONTRADA;
             // Verifica se a corrida está cheia, se já foi finalizada, se o usuário já reservou um assento ou se o usuário é o motorista da corrida
             if (corridas.get(ID).getBancos() == 0) return "ERRO|" + erros.CORRIDA_CHEIA;
             else if (corridas.get(ID).getFinalizada()) return "ERRO|" + erros.CORRIDA_FINALIZADA;
@@ -104,17 +120,20 @@ public class servicosServidor {
                 corridas.get(ID).addCarona(usuario);
                 registros.get(usuario).addCorrida(ID);
 
-                temp.clear();
+                temp.remove(usuario);
                 return "OK|" + okays.CORRIDA_RESERVADA;
             }
         }
 
-        else if (ID.substring(0, 3).equals("COM")) {
-            if (temp.isEmpty()) return "ERRO|" + erros.ID_INVALIDO;
+        else if (ID.startsWith("COM")) {
+            List<String> compostas = temp.get(usuario);
 
-            for (String comp : temp) {
+            if (compostas == null || compostas.isEmpty()) return "ERRO|" + erros.ID_INVALIDO;
+
+            for (String comp : compostas) {
                 String corrida[] = comp.split(";");
-                
+                if (!ID.equals(corrida[0])) continue;
+
                 // Verifica se uma das corridas encheu durante a tentativa de reserva, se o usuário já reservou uma das corridas, 
                 // se o usuário é o motorista de uma das corridas ou se uma das corridas foi finalizada
                 if (corridas.get(corrida[1]).getBancos() == 0 || corridas.get(corrida[2]).getBancos() == 0) 
@@ -133,14 +152,15 @@ public class servicosServidor {
                     corridas.get(ID).addCarona(usuario);
                     corridas.get(corrida[1]).addCarona(usuario);
                     corridas.get(corrida[2]).addCarona(usuario);
+                    registros.get(usuario).addCorrida(ID);
 
-                    temp.clear();
+                    temp.remove(usuario);
                     return "OK|" + okays.CORRIDA_RESERVADA;
                 }
             }
         }
         
-        temp.clear();
+        temp.remove(usuario);
         return "ERRO|" + erros.ID_INVALIDO;
     }
 
@@ -150,9 +170,9 @@ public class servicosServidor {
         List<String> encontrados = new ArrayList<String>();
         for (String corrida : registros.get(usuario).getCorridas()) {
             corrida corridaAtual = corridas.get(corrida);
-            encontrados.add(String.format("---------- Corrida finalizada: %s ----------\n" +
-                "motorista: %s\norigem: %s\ndestino: %s\n" +
-                "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d", 
+            encontrados.add(String.format("---------- Corrida finalizada: %s ----------\\n" +
+                "motorista: %s\\norigem: %s\\ndestino: %s\\n" +
+                "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d", 
                 corridaAtual.getID(), corridaAtual.getmotorista(), corridaAtual.getOrigem(), corridaAtual.getDestino(),
                 corridaAtual.getHorario().getDia(), corridaAtual.getHorario().getMes(), corridaAtual.getHorario().getAno(), 
                 corridaAtual.getHorario().getHora(), corridaAtual.getBancos(), corridaAtual.getPreco()));
@@ -164,7 +184,7 @@ public class servicosServidor {
 
     // Cancela a corrida para motorista ou passageiro, se for motorista, a corrida é finalizada, se for passageiro, remove a carona do histórico do usuário e da corrida
     public synchronized static String cancelarCorrida(String usuario, String ID) {
-        if (ID.substring(0, 2).equals("CAR")) {
+        if (ID.startsWith("CAR")) {
             if (!corridas.containsKey(ID)) return "ERRO|" + erros.CORRIDA_NAO_ENCONTRADA;
             else if (corridas.get(ID).getFinalizada()) return "ERRO|" + erros.CORRIDA_FINALIZADA;
 
@@ -173,7 +193,7 @@ public class servicosServidor {
             
                 // Procura essa corrida entre as corridas compostas
                 for (String corrida : corridas.keySet()) {
-                    if (corrida.substring(0, 3).equals("COM")) {
+                    if (corrida.startsWith("COM")) {
                         cancelarComposta((corridaComposta) corridas.get(corrida), usuario, ID);
                     }
                 }
@@ -190,13 +210,13 @@ public class servicosServidor {
             else return "ERRO|" + erros.CORRIDA_NAO_RESERVADA;
         }
 
-        else if (ID.substring(0, 2).equals("COM")) {
+        else if (ID.startsWith("COM")) {
             if (!corridas.containsKey(ID)) return "ERRO|" + erros.CORRIDA_NAO_ENCONTRADA;
             // Verifica se o usuário reservou a corrida composta
             if (!corridas.get(ID).getCarona().contains(usuario)) return "ERRO|" + erros.CORRIDA_NAO_RESERVADA;
 
             String composta = cancelarComposta((corridaComposta) corridas.get(ID), usuario, ID);
-            if (composta.substring(0, 1).equals("OK")) {
+            if (composta.startsWith("OK")) {
                 corridas.get(ID).finalizarCorrida();
                 return "OK|" + okays.CORRIDA_CANCELADA;
             }
@@ -232,7 +252,7 @@ public class servicosServidor {
         }
 
         // corrida composta é a corrida cancelada
-        else if (corridas.get(ID).getID().equals(ID)) {
+        else if (corrida.getID().equals(ID)) {
             corridas.get(corrida1).removeCarona(usuario);
             corridas.get(corrida2).removeCarona(usuario);
         }
@@ -241,9 +261,9 @@ public class servicosServidor {
     }
 
     // Compara combinações de corrida para evitar repetir uma mesma corrida combinada
-    public static boolean compararComps(String corrida1, String corrida2) {
-        for (String comp : temp) {
-            String corridas[] = comp.split(";");
+    public static boolean compararComps(List<String> comp, String corrida1, String corrida2) {
+        for (String corrida : comp) {
+            String corridas[] = corrida.split(";");
             if (corrida1.equals(corridas[1]) && corrida2.equals(corridas[2])) return true;
             else if (corrida1.equals(corridas[2]) && corrida2.equals(corridas[1])) return true;
         }
@@ -253,11 +273,12 @@ public class servicosServidor {
 
     /* Ferramenta de busca de corridas. Busca combinações de origem-destino, parada-destino, origem-parada, parada-parada 
        para entregar uma possível corrida para o usuário, inclusive combinando corridas. */
-    public synchronized static String buscarCorridas(String dados) {
+    public synchronized static String buscarCorridas(String usuario, String dados) {
         String busca[] = dados.split("\\;");
         String origem = busca[0];
         String destino = busca[1];
         List<String> encontradas = new ArrayList<String>();
+        List<String> compostas = new ArrayList<String>();
 
         // Busca corridas que tenham a cidade de origem e destino desejada entre a sua origem, destino e paradas.
         for (String corrida : corridas.keySet()) {
@@ -266,9 +287,9 @@ public class servicosServidor {
 
             // Corrida sai da cidade de origem e termina na cidade de destino
             else if (corridaAtual.getOrigem().equals(origem) && corridaAtual.getDestino().equals(destino)) {
-                encontradas.add(String.format("---------- Corrida até destino (final): %s ----------\n" + //
-                    "motorista: %s\norigem: %s\ndestino: %s\n" +
-                    "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d", 
+                encontradas.add(String.format("---------- Corrida até destino (final): %s ----------\\n" + //
+                    "motorista: %s\\norigem: %s\\ndestino: %s\\n" +
+                    "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d", 
                     corridaAtual.getID(), corridaAtual.getmotorista(), corridaAtual.getOrigem(), corridaAtual.getDestino(), 
                     corridaAtual.getHorario().getDia(), corridaAtual.getHorario().getMes(), corridaAtual.getHorario().getAno(), 
                     corridaAtual.getHorario().getHora(), corridaAtual.getBancos(), corridaAtual.getPreco()));
@@ -278,9 +299,9 @@ public class servicosServidor {
                 for (String parada : corridaAtual.getParadas()) {
                     // Corrida sai da origem e passa pelo destino
                     if (corridaAtual.getOrigem().equals(origem) && parada.equals(destino)) {
-                        encontradas.add(String.format("---------- Corrida até destino (parada): %s ----------\n" +
-                            "motorista: %s\norigem: %s\nparada de descida: %s (%dª parada)\n" +
-                            "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço por trecho: %d", 
+                        encontradas.add(String.format("---------- Corrida até destino (parada): %s ----------\\n" +
+                            "motorista: %s\\norigem: %s\\nparada de descida: %s (%dª parada)\\n" +
+                            "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço por trecho: %d", 
                             corridaAtual.getID(), corridaAtual.getmotorista(), corridaAtual.getOrigem(), parada, 
                             corridaAtual.getParadas().indexOf(parada) + 1, 
                             corridaAtual.getHorario().getDia(), corridaAtual.getHorario().getMes(), corridaAtual.getHorario().getAno(), 
@@ -289,9 +310,9 @@ public class servicosServidor {
 
                     // Corrida passa pela origem e termina no destino
                     else if (parada.equals(origem) && corridaAtual.getDestino().equals(destino)) {
-                        encontradas.add(String.format("---------- Corrida até destino (parada): %s ----------\n" +
-                            "motorista: %s\nparada de embarque: %s (%dª parada)\ndestino: %s\n" +
-                            "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço por trecho: %d", 
+                        encontradas.add(String.format("---------- Corrida até destino (parada): %s ----------\\n" +
+                            "motorista: %s\\nparada de embarque: %s (%dª parada)\\ndestino: %s\\n" +
+                            "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço por trecho: %d", 
                             corridaAtual.getID(), corridaAtual.getmotorista(), parada, 
                             corridaAtual.getParadas().indexOf(parada) + 1, corridaAtual.getDestino(), 
                             corridaAtual.getHorario().getDia(), corridaAtual.getHorario().getMes(), corridaAtual.getHorario().getAno(), 
@@ -305,9 +326,9 @@ public class servicosServidor {
                             if (corridaAtual.getParadas().indexOf(parada2) <= corridaAtual.getParadas().indexOf(parada)) continue;
 
                             else if (parada2.equals(destino)) {
-                                encontradas.add(String.format("---------- Corrida até destino (paradas): %s ----------\n" +
-                                    "motorista: %s\nparada de embarque: %s (%dª parada)\nparada de descida: %s (%dª parada)\n" +
-                                    "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço por trecho: %d", 
+                                encontradas.add(String.format("---------- Corrida até destino (paradas): %s ----------\\n" +
+                                    "motorista: %s\\nparada de embarque: %s (%dª parada)\\nparada de descida: %s (%dª parada)\\n" +
+                                    "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço por trecho: %d", 
                                     corridaAtual.getID(), corridaAtual.getmotorista(), parada, corridaAtual.getParadas().indexOf(parada) + 1, 
                                     parada2, corridaAtual.getParadas().indexOf(parada2) + 1, 
                                     corridaAtual.getHorario().getDia(), corridaAtual.getHorario().getMes(), corridaAtual.getHorario().getAno(), 
@@ -333,16 +354,16 @@ public class servicosServidor {
                 
                 // Corrida 1 sai da origem e termina na origem da corrida 2, corrida 2 termina no destino
                 else if (corridaAtual1.getOrigem().equals(origem) && corridaAtual2.getOrigem().equals(corridaAtual1.getDestino())
-                    && corridaAtual2.getDestino().equals(destino) && !compararComps(corridaAtual1.getID(), corridaAtual2.getID())) {
+                    && corridaAtual2.getDestino().equals(destino) && !compararComps(compostas, corridaAtual1.getID(), corridaAtual2.getID())) {
                     String ID = String.format("COM%03d", corridas.size() + 1);
-                    String composta = ID + ";" + corridaAtual1.getmotorista() + ";" + corridaAtual2.getmotorista() + ";" + origem + ";" + destino;
-                    temp.add(composta);
+                    String composta = ID + ";" + corridaAtual1.getID() + ";" + corridaAtual2.getID() + ";" + origem + ";" + destino;
+                    compostas.add(composta);
 
-                    encontradas.add(String.format("---------- Corrida combinada: %s ----------\n" +
-                        "motorista 1: %s\norigem: %s\ndestino: %s\n" +
-                        "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d" +
-                        "motorista 2: %s\norigem: %s\ndestino: %s\n" + 
-                        "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d", 
+                    encontradas.add(String.format("---------- Corrida combinada: %s ----------\\n" +
+                        "motorista 1: %s\\norigem: %s\\ndestino: %s\\n" +
+                        "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d" +
+                        "motorista 2: %s\\norigem: %s\\ndestino: %s\\n" + 
+                        "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d", 
                         ID, corridaAtual1.getmotorista(), 
                         corridaAtual1.getOrigem(), corridaAtual1.getDestino(), 
                         corridaAtual1.getHorario().getDia(), 
@@ -367,16 +388,16 @@ public class servicosServidor {
 
                         // Corrida 1 sai da cidade de origem e passa pela origem da corrida 2, corrida 2 termina no destino
                         if (corridaAtual1.getOrigem().equals(origem) && corridaAtual2.getOrigem().equals(parada) && corridaAtual2.getDestino().equals(destino)
-                            && !compararComps(corridaAtual1.getID(), corridaAtual2.getID())) {
+                            && !compararComps(compostas, corridaAtual1.getID(), corridaAtual2.getID())) {
                             String ID = String.format("COM%03d", corridas.size() + 1);
-                            String composta = ID + ";" + corridaAtual1.getmotorista() + ";" + corridaAtual2.getmotorista() + ";" + origem + ";" + destino;
-                            temp.add(composta);
+                            String composta = ID + ";" + corridaAtual1.getID() + ";" + corridaAtual2.getID() + ";" + origem + ";" + destino;
+                            compostas.add(composta);
 
-                            encontradas.add(String.format("---------- Corrida combinada: %s ----------\n" +
-                                "motorista 1: %s\norigem: %s\nparada de descida: %s (%dª parada)\n" +
-                                "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d" +
-                                "motorista 2: %s\norigem: %s\ndestino: %s\n" + 
-                                "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d", 
+                            encontradas.add(String.format("---------- Corrida combinada: %s ----------\\n" +
+                                "motorista 1: %s\\norigem: %s\\nparada de descida: %s (%dª parada)\\n" +
+                                "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d" +
+                                "motorista 2: %s\\norigem: %s\\ndestino: %s\\n" + 
+                                "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d", 
                                 ID, corridaAtual1.getmotorista(), 
                                 corridaAtual1.getOrigem(), 
                                 parada, corridaAtual1.getParadas().indexOf(parada) + 1, 
@@ -403,16 +424,16 @@ public class servicosServidor {
 
                                 // Corrida 1 passa pela parada da corrida 2 e a corrida 2 termina no destino
                                 if (parada.equals(parada3) && corridaAtual2.getDestino().equals(destino)
-                                    && !compararComps(corridaAtual1.getID(), corridaAtual2.getID())) {
+                                    && !compararComps(compostas, corridaAtual1.getID(), corridaAtual2.getID())) {
                                     String ID = String.format("COM%03d", corridas.size() + 1);
-                                    String composta = ID + ";" + corridaAtual1.getmotorista() + ";" + corridaAtual2.getmotorista() + ";" + origem + ";" + destino;
-                                    temp.add(composta);
+                                    String composta = ID + ";" + corridaAtual1.getID() + ";" + corridaAtual2.getID() + ";" + origem + ";" + destino;
+                                    compostas.add(composta);
 
-                                    encontradas.add(String.format("---------- Corrida combinada: %s ----------\n" +
-                                        "motorista 1: %s\norigem: %s\nparada de descida: %s (%dª parada)\n" +
-                                        "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d" +
-                                        "motorista 2: %s\nparada de embarque: %s (%dª parada)\ndestino: %s\n" + 
-                                        "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d", 
+                                    encontradas.add(String.format("---------- Corrida combinada: %s ----------\\n" +
+                                        "motorista 1: %s\\norigem: %s\\nparada de descida: %s (%dª parada)\\n" +
+                                        "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d" +
+                                        "motorista 2: %s\\nparada de embarque: %s (%dª parada)\\ndestino: %s\\n" + 
+                                        "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d", 
                                         ID, corridaAtual1.getmotorista(), 
                                         corridaAtual1.getOrigem(), 
                                         parada, corridaAtual1.getParadas().indexOf(parada) + 1, 
@@ -438,16 +459,16 @@ public class servicosServidor {
                                     for (String parada4 : corridaAtual2.getParadas()) {
                                         if (corridaAtual2.getParadas().indexOf(parada4) <= corridaAtual2.getParadas().indexOf(parada3)) continue;
 
-                                        else if (parada4.equals(destino) && !compararComps(corridaAtual1.getID(), corridaAtual2.getID())) {
+                                        else if (parada4.equals(destino) && !compararComps(compostas, corridaAtual1.getID(), corridaAtual2.getID())) {
                                             String ID = String.format("COM%03d", corridas.size() + 1);
-                                            String composta = ID + ";" + corridaAtual1.getmotorista() + ";" + corridaAtual2.getmotorista() + ";" + origem + ";" + destino;
-                                            temp.add(composta);
+                                            String composta = ID + ";" + corridaAtual1.getID() + ";" + corridaAtual2.getID() + ";" + origem + ";" + destino;
+                                            compostas.add(composta);
 
-                                            encontradas.add(String.format("---------- Corrida combinada: %s ----------\n" +
-                                                "motorista 1: %s\norigem: %s\nparada de descida: %s (%dª parada)\n" +
-                                                "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d" +
-                                                "motorista 2: %s\nparada de embarque: %s (%dª parada)\ndestino: %s\n" + 
-                                                "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d", 
+                                            encontradas.add(String.format("---------- Corrida combinada: %s ----------\\n" +
+                                                "motorista 1: %s\\norigem: %s\\nparada de descida: %s (%dª parada)\\n" +
+                                                "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d" +
+                                                "motorista 2: %s\\nparada de embarque: %s (%dª parada)\\ndestino: %s\\n" + 
+                                                "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d", 
                                                 ID, corridaAtual1.getmotorista(), 
                                                 corridaAtual1.getOrigem(), 
                                                 parada, corridaAtual1.getParadas().indexOf(parada) + 1, 
@@ -478,16 +499,16 @@ public class servicosServidor {
                                 
                                 // corrida 1 passa pela origem da corrida 2 e corrida 2 termina no destino
                                 else if (parada2.equals(corridaAtual2.getOrigem()) && corridaAtual2.getDestino().equals(destino)
-                                    && !compararComps(corridaAtual1.getID(), corridaAtual2.getID())) {
+                                    && !compararComps(compostas, corridaAtual1.getID(), corridaAtual2.getID())) {
                                     String ID = String.format("COM%03d", corridas.size() + 1);
-                                    String composta = ID + ";" + corridaAtual1.getmotorista() + ";" + corridaAtual2.getmotorista() + ";" + origem + ";" + destino;
-                                    temp.add(composta);
+                                    String composta = ID + ";" + corridaAtual1.getID() + ";" + corridaAtual2.getID() + ";" + origem + ";" + destino;
+                                    compostas.add(composta);
 
-                                    encontradas.add(String.format("---------- Corrida combinada: %s ----------\n" +
-                                        "motorista 1: %s\nparada de embarque: %s (%dª parada)\nparada de descida: %s (%dª parada)\n" +
-                                        "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d" +
-                                        "motorista 2: %s\norigem: %s\ndestino: %s\n" + 
-                                        "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d", 
+                                    encontradas.add(String.format("---------- Corrida combinada: %s ----------\\n" +
+                                        "motorista 1: %s\\nparada de embarque: %s (%dª parada)\\nparada de descida: %s (%dª parada)\\n" +
+                                        "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d" +
+                                        "motorista 2: %s\\norigem: %s\\ndestino: %s\\n" + 
+                                        "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d", 
                                         ID, corridaAtual1.getmotorista(), 
                                         parada, corridaAtual1.getParadas().indexOf(parada) + 1, 
                                         parada2, corridaAtual1.getParadas().indexOf(parada2) + 1, 
@@ -514,16 +535,16 @@ public class servicosServidor {
                                         
                                         // corrida 2 termina no destino
                                         if (parada3.equals(parada2) && corridaAtual2.getDestino().equals(destino) && 
-                                            !compararComps(corridaAtual1.getID(), corridaAtual2.getID())) {
+                                            !compararComps(compostas, corridaAtual1.getID(), corridaAtual2.getID())) {
                                             String ID = String.format("COM%03d", corridas.size() + 1);
-                                            String composta = ID + ";" + corridaAtual1.getmotorista() + ";" + corridaAtual2.getmotorista() + ";" + origem + ";" + destino;
-                                            temp.add(composta);
+                                            String composta = ID + ";" + corridaAtual1.getID() + ";" + corridaAtual2.getID() + ";" + origem + ";" + destino;
+                                            compostas.add(composta);
 
-                                            encontradas.add(String.format("---------- Corrida combinada: %s ----------\n" +
-                                                "motorista 1: %s\nparada de embarque: %s (%dª parada)\nparada de descida: %s (%dª parada)\n" +
-                                                "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d" +
-                                                "motorista 2: %s\nparada de embarque: %s (%dª parada)\ndestino: %s\n" + 
-                                                "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d", 
+                                            encontradas.add(String.format("---------- Corrida combinada: %s ----------\\n" +
+                                                "motorista 1: %s\\nparada de embarque: %s (%dª parada)\\nparada de descida: %s (%dª parada)\\n" +
+                                                "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d" +
+                                                "motorista 2: %s\\nparada de embarque: %s (%dª parada)\\ndestino: %s\\n" + 
+                                                "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d", 
                                                 ID, corridaAtual1.getmotorista(), 
                                                 parada, corridaAtual1.getParadas().indexOf(parada) + 1, 
                                                 parada2, corridaAtual1.getParadas().indexOf(parada2) + 1, 
@@ -549,17 +570,17 @@ public class servicosServidor {
                                             for (String parada4 : corridaAtual2.getParadas()) {
                                                 if (corridaAtual2.getParadas().indexOf(parada4) <= corridaAtual2.getParadas().indexOf(parada3)) continue;
 
-                                                else if (parada4.equals(destino) && !compararComps(corridaAtual1.getID(), corridaAtual2.getID())) {
+                                                else if (parada4.equals(destino) && !compararComps(compostas, corridaAtual1.getID(), corridaAtual2.getID())) {
                                                     String ID = String.format("COM%03d", corridas.size() + 1);
-                                                    String composta = ID + ";" + corridaAtual1.getmotorista() + ";" + corridaAtual2.getmotorista() 
+                                                    String composta = ID + ";" + corridaAtual1.getID() + ";" + corridaAtual2.getID() 
                                                                     + ";" + origem + ";" + destino;
-                                                    temp.add(composta);
+                                                    compostas.add(composta);
 
-                                                    encontradas.add(String.format("---------- Corrida combinada: %s ----------\n" +
-                                                        "motorista 1: %s\nparada de embarque: %s (%dª parada)\nparada de descida: %s (%dª parada)\n" +
-                                                        "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d" +
-                                                        "motorista 2: %s\nparada de embarque: %s (%dª parada)\nparada de descida: %s (%dª parada)\n" + 
-                                                        "data e horário: %s/%s/%s %s\nassentos disponíveis: %d\npreço: %d", 
+                                                    encontradas.add(String.format("---------- Corrida combinada: %s ----------\\n" +
+                                                        "motorista 1: %s\\nparada de embarque: %s (%dª parada)\\nparada de descida: %s (%dª parada)\\n" +
+                                                        "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d" +
+                                                        "motorista 2: %s\\nparada de embarque: %s (%dª parada)\\nparada de descida: %s (%dª parada)\\n" + 
+                                                        "data e horário: %s/%s/%s %s\\nassentos disponíveis: %d\\npreço: %d", 
                                                         ID, corridaAtual1.getmotorista(), 
                                                         parada, corridaAtual1.getParadas().indexOf(parada) + 1, 
                                                         parada2, corridaAtual1.getParadas().indexOf(parada2) + 1, 
@@ -591,6 +612,7 @@ public class servicosServidor {
         }
 
         if (encontradas.isEmpty()) return "ERRO|" + erros.CORRIDA_NAO_ENCONTRADA;
+        if (!compostas.isEmpty()) temp.put(usuario, compostas);
 
         String lista = String.join(";", encontradas);
         return "OK|" + okays.CORRIDA_ENCONTRADA + "|" + lista;

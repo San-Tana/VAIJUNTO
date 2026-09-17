@@ -62,7 +62,7 @@ public class Servidor {
             else if (operacao[0].equals("HISTORICO")) saida.println(servicosServidor.historico(operacao[1]));
             else if (operacao[0].equals("CANCELAR")) saida.println(servicosServidor.cancelarCorrida(operacao[1], operacao[2]));
             else if (operacao[0].equals("PUBLICAR")) saida.println(servicosServidor.publicarCorrida(operacao[1], operacao[2]));
-            else if (operacao[0].equals("BUSCAR")) saida.println(servicosServidor.buscarCorridas(operacao[1]));
+            else if (operacao[0].equals("BUSCAR")) saida.println(servicosServidor.buscarCorridas(operacao[1], operacao[2]));
             
         } catch (Exception e) {
             System.out.println("Erro ao atender cliente: ");

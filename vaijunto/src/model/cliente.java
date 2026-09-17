@@ -13,7 +13,6 @@ public class cliente {
     // Cliente passageiro
     public cliente (String usuario, String senha) {
         this.logado = true;
-
         this.usuario = usuario;
         this.senha = senha;
         this.corridas = new ArrayList<String>();
@@ -22,7 +21,6 @@ public class cliente {
     // Cliente passageiro E motorista
     public cliente (String usuario, String senha, motorista veiculo) {
         this.logado = true;
-
         this.usuario = usuario;
         this.senha = senha;
         this.veiculo = veiculo;
@@ -46,7 +44,7 @@ public class cliente {
 
     @Override 
     public String toString() { 
-        String cliente = logado + ";" + usuario + ";" + veiculo;
+        String cliente = logado + ";" + usuario + ";" + senha + ";" + veiculo;
         if (!corridas.isEmpty()) { cliente += ";" + String.join("&", corridas); }
         return cliente; 
     }
