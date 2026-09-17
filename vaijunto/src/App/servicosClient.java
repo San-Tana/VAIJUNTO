@@ -172,7 +172,7 @@ public class servicosClient {
         else if (mensagem.equals(erros.CAMPO_VAZIO)) 
             System.out.println("Campo vazio, tente novamente.");
         else if (mensagem.equals(erros.USUARIO_SEM_REGISTRO)) 
-            System.out.println("Usuario não encontrado. Faça registro no system");
+            System.out.println("Usuario não encontrado. Faça registro no sistema. ");
         else if (mensagem.equals(erros.SENHA_ERRADA))
             System.out.println("Senha incorreta, tente novamente.");
         else if (mensagem.equals(erros.USUARIO_IGUAL)) 

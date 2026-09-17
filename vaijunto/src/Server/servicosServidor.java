@@ -14,6 +14,7 @@ public class servicosServidor {
     // Faz o login do cliente, verificando se o usuário não está logado, se a senha está correta e se o usuário existe no sistema
     public synchronized static String login(String dados) {
         String login[] = dados.split("\\;");
+        if (!registros.containsKey(login[0])) return "ERRO|" + erros.USUARIO_SEM_REGISTRO;
         if (registros.get(login[0]).getLogado()) return "ERRO|" + erros.USUARIO_LOGADO;
         else if (!registros.get(login[0]).getSenha().equals(login[1])) return "ERRO|" + erros.SENHA_ERRADA;
         else if (registros.get(login[0]).getSenha().equals(login[1])) {

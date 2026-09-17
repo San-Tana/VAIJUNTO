@@ -76,7 +76,7 @@ public class Aplicacao {
             }
         }
         
-        requisicao("DESLOGAR|" + Usuario);
+        if (logado) requisicao("DESLOGAR|" + Usuario);
         scan.close();
     }
 
@@ -108,10 +108,6 @@ public class Aplicacao {
                 if (resposta[1].equals(okays.USUARIO_LOGADO) || resposta[1].equals(okays.USUARIO_REGISTRADO)) {
                     Usuario = resposta[2];
                     logado = true;
-                }
-                else if (resposta[1].equals(okays.USUARIO_DESLOGADO)) {
-                    Usuario = null;
-                    logado = false;
                 }
                 else if (resposta[1].equals(okays.HISTORICO_ENCONTRADO) || resposta[1].equals(okays.CORRIDA_ENCONTRADA)) {
                     List<String> corridas = Arrays.asList(resposta[2].split(";"));
