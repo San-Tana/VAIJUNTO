@@ -31,6 +31,7 @@ public class cliente {
 
     public String getUsuario() { return usuario; }
     public String getSenha() { return senha; }
+    public motorista getVeiculo() { return veiculo; }
     public boolean getLogado() { return logado; }
 
     public void setUsuario(String novo) { this.usuario = novo; }

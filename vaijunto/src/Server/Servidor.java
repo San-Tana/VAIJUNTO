@@ -57,6 +57,7 @@ public class Servidor {
             else if (operacao[0].equals("REGISTRO")) saida.println(servicosServidor.registro(operacao[1]));
             else if (operacao[0].equals("CONSULTAR")) saida.println(servicosServidor.existeUsuario(operacao[1]));
             else if (operacao[0].equals("DESLOGAR")) saida.println(servicosServidor.deslogar(operacao[1]));
+            else if (operacao[0].equals("MOTORISTA")) saida.println(servicosServidor.usuarioMotorista(operacao[1]));
             else if (operacao[0].equals("RESERVAR")) saida.println(servicosServidor.reservarCorrida(operacao[1], operacao[2]));
             else if (operacao[0].equals("HISTORICO")) saida.println(servicosServidor.historico(operacao[1]));
             else if (operacao[0].equals("CANCELAR")) saida.println(servicosServidor.cancelarCorrida(operacao[1], operacao[2]));

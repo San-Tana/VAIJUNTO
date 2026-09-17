@@ -4,6 +4,7 @@ public class erros {
     public static final String USUARIO_LOGADO = "USUARIO EM OUTRO DISPOSITIVO";
     public static final String CAMPO_VAZIO = "CAMPO_VAZIO";
     public static final String USUARIO_SEM_REGISTRO = "USUARIO NAO REGISTRADO";
+    public static final String USUARIO_PASSAGEIRO = "USUARIO NAO TEM VEICULO";
     public static final String SENHA_ERRADA = "SENHA INCORRETA";
     public static final String USUARIO_IGUAL = "USUARIO JA EXISTENTE";
     public static final String ENTRADA_INVALIDA = "ENTRADA INVALIDA";

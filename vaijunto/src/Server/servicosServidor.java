@@ -60,6 +60,11 @@ public class servicosServidor {
         else return "ERRO|" + erros.USUARIO_IGUAL;
     }
 
+    public static String usuarioMotorista(String usuario) {
+        if (registros.get(usuario).getVeiculo() != null) return "OK|" + okays.USUARIO_MOTORISTA;
+        return "ERRO|" + erros.USUARIO_PASSAGEIRO;
+    }
+
     // Registra uma nova corrida, seja ela com ou sem paradas, e adiciona a corrida no histórico do usuário
     public synchronized static String publicarCorrida(String usuario, String dados) {
         String corrida[] = dados.split("\\;");

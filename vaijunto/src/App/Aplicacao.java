@@ -61,8 +61,9 @@ public class Aplicacao {
                     }
                 }
                 else if (opcao.equals("2")) {
+                    resposta = requisicao("MOTORISTA|" + Usuario);
                     String novaViajem = servicosClient.novaViajem(scan);
-                    resposta =requisicao("DIRIGIR|" + novaViajem);
+                    resposta = requisicao("DIRIGIR|" + novaViajem);
                 }
                 else if (opcao.equals("3")) {
                     resposta = requisicao("HISTORICO|" + Usuario);

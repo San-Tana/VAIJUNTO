@@ -177,6 +177,8 @@ public class servicosClient {
             System.out.println("Senha incorreta, tente novamente.");
         else if (mensagem.equals(erros.USUARIO_IGUAL)) 
             System.out.println("Esse nome de usuário já está em uso, escolha outro.");
+        else if (mensagem.equals(erros.USUARIO_PASSAGEIRO))
+            System.out.println("Não é possível criar uma viajem sem um veiculo registrado");
         else if (mensagem.equals(erros.ENTRADA_INVALIDA)) 
             System.out.println("Entrada inválida, tente novamente.");
         else if (mensagem.equals(erros.ID_INVALIDO))
