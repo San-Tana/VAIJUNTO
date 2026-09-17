@@ -44,7 +44,7 @@ public class servicosServidor {
         }
 
         System.out.println("Cliente registrado: " + registros.get(registro[0]).getUsuario());
-        return "OK|" + okays.USUARIO_REGISTRADO;
+        return "OK|" + okays.USUARIO_REGISTRADO + "|" + registro[0];
     }
 
 
